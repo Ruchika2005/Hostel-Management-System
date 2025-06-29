@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hostel Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f5f5dc, #fdf6e3);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .container {
+            min-height: 100vh;
+        }
+
+        .card {
+            background-color: #fffaf0;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            padding: 40px 30px;
+            border: none;
+        }
+
+        h2 {
+            color: #5c4d30;
+            font-weight: 600;
+        }
+
+        .btn-admin {
+            background-color: #a0895d;
+            color: white;
+            font-weight: 500;
+            border: none;
+        }
+
+        .btn-admin:hover {
+            background-color: #8b734c;
+        }
+
+        .btn-user {
+            background-color: #c3a883;
+            color: white;
+            font-weight: 500;
+            border: none;
+        }
+
+        .btn-user:hover {
+            background-color: #b19570;
+        }
+    </style>
+</head>
+<body class="d-flex justify-content-center align-items-center">
+    <div class="container d-flex justify-content-center align-items-center">
+        <div class="card text-center" style="max-width: 400px; width: 100%;">
+            <h2 class="mb-4">Hostel Management System</h2>
+            <a href="{{ url_for('admin_login') }}" class="btn btn-admin w-100 mb-3">Admin Login</a>
+            <a href="{{ url_for('student_login') }}" class="btn btn-user w-100">Student Login</a>
+        </div>
+    </div>
+</body>
+</html>

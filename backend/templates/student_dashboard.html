@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #e8f5e9;
+            font-family: 'Inter', sans-serif;
+        }
+        .dashboard-card {
+            border-radius: 16px;
+            background: #fff;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+            padding: 30px;
+            position: relative;
+        }
+        .heading {
+            color: #28a745;
+            font-weight: 600;
+        }
+        .roommate-card {
+            background: #f1f8f2;
+            border: 1px solid #c3e6cb;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div class="container mt-4">
+        <div class="dashboard-card">
+            <form method="POST" action="{{ url_for('student_logout') }}">
+                <button type="submit" class="btn btn-danger btn-sm logout-btn">Logout</button>
+            </form>
+
+            <h3 class="heading mb-4">Welcome, {{ student.name }}</h3>
+            <p><strong>Room:</strong> {{ student.room_id }}</p>
+            <p><strong>Roll Number:</strong> {{ student.roll_no }}</p>
+            <p><strong>Branch:</strong> {{ student.branch }}</p>
+            <p><strong>Year:</strong> {{ student.year }}</p>
+
+            <hr>
+
+            <h5 class="mb-3">Your Roommates:</h5>
+            {% if roommates %}
+                {% for mate in roommates %}
+                    <div class="roommate-card">
+                        <p><strong>Name:</strong> {{ mate.name }}</p>
+                        <p><strong>Roll No:</strong> {{ mate.roll_no }}</p>
+                        <p><strong>Branch:</strong> {{ mate.branch }}</p>
+                        <p><strong>Year:</strong> {{ mate.year }}</p>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p>No roommates found.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
