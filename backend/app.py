@@ -414,7 +414,7 @@ def accept_room():
     roll_no = session['roll_no']
     conn = get_connection()
     try:
-        with conn.cursor() as cursor:
+        with conn.cursor(pymysql.cursors.DictCursor) as cursor:
             # 1. Get applicant details
             cursor.execute("SELECT * FROM applications WHERE roll_no = %s", (roll_no,))
             applicant = cursor.fetchone()
@@ -422,8 +422,13 @@ def accept_room():
             if not applicant:
                 return "Applicant not found", 404
 
+            gender = applicant['gender']
+
             # 2. Get allocated room from allotments
-            cursor.execute("SELECT room_id FROM allotments WHERE student_roll_no = %s AND status IN ('pending', 'accepted')", (roll_no,))
+            cursor.execute("""
+                SELECT room_id FROM allotments 
+                WHERE student_roll_no = %s AND status IN ('pending', 'accepted')
+            """, (roll_no,))
             result = cursor.fetchone()
             if not result:
                 return "No room allocated", 400
@@ -448,12 +453,40 @@ def accept_room():
             # 6. Update application status
             cursor.execute("UPDATE applications SET status = 'accepted' WHERE roll_no = %s", (roll_no,))
 
+            # 7. Check remaining vacant seats of same gender
+            cursor.execute("""
+                SELECT SUM(capacity - occupants) AS vacant_seats 
+                FROM rooms 
+                WHERE gender = %s AND occupants < capacity
+            """, (gender,))
+            vacant_result = cursor.fetchone()
+            vacant = vacant_result['vacant_seats'] if vacant_result['vacant_seats'] else 0
+
+            # 8. If no seats left, decline other pending applications and cancel allotments
+            if vacant == 0:
+                # Update applications of same gender that are still pending
+                cursor.execute("""
+                    UPDATE applications 
+                    SET status = 'declined' 
+                    WHERE gender = %s AND status = 'pending'
+                """, (gender,))
+
+                # Update allotments of same gender still pending
+                cursor.execute("""
+                    UPDATE allotments 
+                    SET status = 'cancel' 
+                    WHERE student_roll_no IN (
+                        SELECT roll_no FROM applications WHERE gender = %s AND status = 'declined'
+                    ) AND status = 'pending'
+                """, (gender,))
+
         conn.commit()
         session.clear()
         return redirect(url_for('student_login'))
 
     finally:
         conn.close()
+
 
 # ✅ Reject Room
 @app.route('/applicant/reject-room', methods=['POST'])
