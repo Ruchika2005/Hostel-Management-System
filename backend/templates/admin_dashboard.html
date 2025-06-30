@@ -1,4 +1,3 @@
-<!-- templates/admin_dashboard.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,22 +9,15 @@
             background: #f0f2f5;
             font-family: 'Inter', sans-serif;
         }
-        .card {
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            padding: 30px;
-            margin-bottom: 30px;
-            background-color: #fff;
-        }
         .room-box {
-            border: 1px solid #28a745;
+            border: 1px solid #17a2b8;
             border-radius: 8px;
             padding: 10px;
             margin-bottom: 15px;
-            background: #eafce6;
+            background: #e3f7fd;
         }
         .room-heading {
-            background-color: #28a745;
+            background-color: #17a2b8;
             color: white;
             padding: 5px 10px;
             border-radius: 6px;
@@ -34,7 +26,7 @@
         .section-title {
             margin-top: 30px;
             font-weight: 600;
-            color: #218838;
+            color: #138496;
         }
     </style>
 </head>
@@ -43,35 +35,40 @@
 {% include 'admin_navbar.html' %}
 
 <div class="container mt-4">
-    <div class="card text-center">
+    <div class="card text-center p-3 mb-3">
+        <h4>Room Chart</h4>
         <p>Total Hostel Capacity: <strong>{{ total_seats }}</strong> | Vacant Seats: <strong>{{ vacant_seats }}</strong></p>
     </div>
 
     {% for wing, floors in room_data.items() %}
-        <h4 class="section-title">Wing {{ wing }}</h4>
-        {% for floor, rooms in floors.items() %}
+    <h4 class="section-title">Wing {{ wing }}</h4>
+        {% for floor, rooms in floors|dictsort %}
             <h5 class="section-title">Floor {{ floor }}</h5>
             <div class="row">
-                {% for room_id, students in rooms.items() %}
-    <div class="col-md-2">
-        <div class="room-box">
-            <div class="room-heading">Room {{ room_id }}</div>
-            {% if students %}
-                <ul class="mt-2 mb-0">
-                    {% for student in students %}
-                        <li>{{ student.name }} ({{ student.roll_no }})</li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p class="mt-2">Empty</p>
-            {% endif %}
-        </div>
-    </div>
-{% endfor %}
-
+                {% for room_id, students in rooms|dictsort %}
+                    <div class="col-md-2">
+                        <div class="room-box">
+                            <div class="room-heading">Room {{ room_id }}</div>
+                            {% if students %}
+                                <ul class="mt-2 mb-0 list-unstyled">
+                                    {% for student in students %}
+                                        <li class="mb-2">
+                                            <strong>{{ student.name }}</strong> ({{ student.roll_no }})<br>
+                                            {{ student.year }} Yr, {{ student.branch }}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="mt-2 text-muted">Vacant</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
             </div>
         {% endfor %}
     {% endfor %}
+
+
 </div>
 
 </body>

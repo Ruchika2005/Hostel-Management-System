@@ -48,15 +48,41 @@ def applicant_dashboard():
 
     roll_no = session['roll_no']
     conn = get_connection()
-    with conn.cursor(cursor=pymysql.cursors.DictCursor) as cursor:
-        cursor.execute("SELECT * FROM applications WHERE roll_no=%s", (roll_no,))
+    with conn.cursor(pymysql.cursors.DictCursor) as cursor:
+        # 1. Fetch applicant info
+        cursor.execute("SELECT * FROM applications WHERE roll_no = %s", (roll_no,))
         applicant = cursor.fetchone()
+
+        # 2. Fetch room_id from allotments table
+        room_id = None
+        if applicant:
+            cursor.execute("SELECT room_id FROM allotments WHERE student_roll_no = %s AND status IN ('accepted', 'pending')", (roll_no,))
+            result = cursor.fetchone()
+            if result:
+                room_id = result['room_id']
+
+        # 3. Fetch roommates (excluding self), from BOTH students and applications
+        roommates = []
+        if room_id:
+            # Get roommates who have accepted (from students)
+            cursor.execute("""
+                SELECT s.roll_no, s.name, s.branch, s.year
+                FROM students s
+                WHERE s.room_id = %s AND s.roll_no != %s
+            """, (room_id, roll_no))
+            roommates += cursor.fetchall()
+
+            # Get roommates who are pending (from applications + allotments)
+            cursor.execute("""
+                SELECT a.roll_no, a.name, a.branch, a.year
+                FROM allotments al
+                JOIN applications a ON al.student_roll_no = a.roll_no
+                WHERE al.room_id = %s AND al.status ='pending' AND a.roll_no != %s
+            """, (room_id, roll_no))
+            roommates += cursor.fetchall()
+
     conn.close()
-
-    if not applicant:
-        return redirect(url_for('student_login'))
-
-    return render_template("applicant_dashboard.html", applicant=applicant)
+    return render_template('applicant_dashboard.html', applicant=applicant, room_id=room_id, roommates=roommates)
 
 
 # ✅ Admin Logout
@@ -112,51 +138,47 @@ def admin_dashboard():
 
     conn = get_connection()
     with conn.cursor(pymysql.cursors.DictCursor) as cursor:
-        # ✅ Get all students and their rooms
-        cursor.execute("SELECT name, roll_no, branch, year, room_id FROM students")
+        # Fetch students with room data
+        cursor.execute("""
+            SELECT s.roll_no, s.name, s.branch, s.year, s.room_id
+            FROM students s
+        """)
         students = cursor.fetchall()
 
-        # ✅ Get total number of rooms
-        cursor.execute("SELECT COUNT(*) AS total_rooms FROM rooms")
-        total_rooms = cursor.fetchone()['total_rooms']
-
-        # ✅ Get capacity and occupied info for each room
-        cursor.execute("""
-            SELECT r.room_id, r.capacity, COUNT(s.roll_no) AS occupied
-            FROM rooms r
-            LEFT JOIN students s ON r.room_id = s.room_id
-            GROUP BY r.room_id, r.capacity
-        """)
-        room_status = cursor.fetchall()
-
-        # ✅ Calculate total seats
-        cursor.execute("SELECT SUM(capacity) AS total_capacity FROM rooms")
-        total_seats = cursor.fetchone()['total_capacity']
+        # Fetch all rooms
+        cursor.execute("SELECT * FROM rooms")
+        all_rooms = cursor.fetchall()
 
     conn.close()
 
-    # ✅ Calculate vacant seats
-    vacant_seats = sum(room['capacity'] - room['occupied'] for room in room_status)
-
-    # ✅ Organize room data for display
+    # Organize room data with empty lists
     room_data = {}
+    for room in all_rooms:
+        room_id = room['room_id']
+        wing = room_id[0]
+        floor = int(room_id[1])
+        if wing not in room_data:
+            room_data[wing] = {}
+        if floor not in room_data[wing]:
+            room_data[wing][floor] = {}
+        room_data[wing][floor][room_id] = []
+
+    # Assign students to rooms
     for stu in students:
         room_id = stu['room_id']
-        if not room_id:
-            continue  # Skip unassigned students
+        wing = room_id[0]
+        floor = int(room_id[1])
+        room_data[wing][floor][room_id].append(stu)
 
-        wing = room_id[0]        # e.g., 'A' from 'A101'
-        floor = int(room_id[1])  # e.g., '1' from 'A101'
-        room_no = room_id
-
-        room_data.setdefault(wing, {}).setdefault(floor, {}).setdefault(room_no, []).append(stu)
+    # Stats
+    total_seats = sum(r['capacity'] for r in all_rooms)
+    vacant_seats = sum(r['capacity'] - r['occupants'] for r in all_rooms)
 
     return render_template("admin_dashboard.html",
-                           name=session['admin_name'],
-                           total_rooms=total_rooms,
+                           room_data=room_data,
                            total_seats=total_seats,
                            vacant_seats=vacant_seats,
-                           room_data=room_data)
+                           name=session['admin_name'])
 
 
 
@@ -172,8 +194,8 @@ def cancel_application():
         cursor.execute("UPDATE applications SET status = 'cancelled' WHERE roll_no = %s", (roll_no,))
         conn.commit()
     conn.close()
-    session.clear()
-    return redirect(url_for('student_login'))
+    
+    return redirect(url_for('applicant_dashboard'))
 
 
 # ✅ Applicant Logout
@@ -197,6 +219,20 @@ def admin_applications():
     conn.close()
 
     return render_template('admin_applications.html', applications=applications, active_page='applications', name=session['admin_name'])
+
+# ✅ Reject Application Route
+@app.route('/admin/reject', methods=['POST'])
+def reject_application():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+
+    roll_no = request.form['roll_no']
+    conn = get_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("UPDATE applications SET status = 'declined' WHERE roll_no = %s", (roll_no,))
+        conn.commit()
+    conn.close()
+    return redirect(url_for('admin_applications'))
 
 # ✅ Student Login (checks application → students)
 @app.route('/student/login', methods=['GET', 'POST'])
@@ -319,7 +355,7 @@ def start_allotment():
                 # Insert into allotments
                 cursor.execute("""
                     INSERT INTO allotments (student_roll_no, room_id, status)
-                    VALUES (%s, %s, 'accepted')
+                    VALUES (%s, %s, 'pending')
                 """, (roll_no, room_id))
 
             except Exception as e:
@@ -332,7 +368,8 @@ def start_allotment():
     conn.close()
     return redirect(url_for('admin_allotment'))
 
-# ✅ 2. ALLOTMENT VIEW PAGE
+
+# ✅ Admin Allotment Chart Route
 @app.route('/admin/allotment')
 def admin_allotment():
     if not session.get('admin_logged_in'):
@@ -341,10 +378,9 @@ def admin_allotment():
     conn = get_connection()
     with conn.cursor(pymysql.cursors.DictCursor) as cursor:
         cursor.execute("""
-            SELECT a.student_roll_no, a.room_id, s.name, s.branch, s.year
+            SELECT a.student_roll_no, a.room_id, a.status, s.name, s.branch, s.year
             FROM allotments a
             JOIN applications s ON a.student_roll_no = s.roll_no
-            
         """)
         students = cursor.fetchall()
     conn.close()
@@ -368,6 +404,106 @@ def admin_allotment():
         room_data[wing][floor][room_id].append(stu)
 
     return render_template("admin_allotment.html", room_data=room_data, name=session['admin_name'])
+
+# ✅ Accept Room
+@app.route('/applicant/accept-room', methods=['POST'])
+def accept_room():
+    if not session.get('student_logged_in') or session.get('student_type') != 'applicant':
+        return redirect(url_for('student_login'))
+
+    roll_no = session['roll_no']
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 1. Get applicant details
+            cursor.execute("SELECT * FROM applications WHERE roll_no = %s", (roll_no,))
+            applicant = cursor.fetchone()
+
+            if not applicant:
+                return "Applicant not found", 404
+
+            # 2. Get allocated room from allotments
+            cursor.execute("SELECT room_id FROM allotments WHERE student_roll_no = %s AND status IN ('pending', 'accepted')", (roll_no,))
+            result = cursor.fetchone()
+            if not result:
+                return "No room allocated", 400
+
+            room_id = result['room_id']
+
+            # 3. Insert into students table
+            cursor.execute("""
+                INSERT INTO students (roll_no, name, email, phone, branch, year, gender, password, room_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                applicant['roll_no'], applicant['name'], applicant['email'], applicant['phone'],
+                applicant['branch'], applicant['year'], applicant['gender'], applicant['password'], room_id
+            ))
+
+            # 4. Update room occupants
+            cursor.execute("UPDATE rooms SET occupants = occupants + 1 WHERE room_id = %s", (room_id,))
+
+            # 5. Update allotments status
+            cursor.execute("UPDATE allotments SET status = 'accepted' WHERE student_roll_no = %s", (roll_no,))
+
+            # 6. Update application status
+            cursor.execute("UPDATE applications SET status = 'accepted' WHERE roll_no = %s", (roll_no,))
+
+        conn.commit()
+        session.clear()
+        return redirect(url_for('student_login'))
+
+    finally:
+        conn.close()
+
+# ✅ Reject Room
+@app.route('/applicant/reject-room', methods=['POST'])
+def reject_room():
+    if not session.get('student_logged_in') or session.get('student_type') != 'applicant':
+        return redirect(url_for('student_login'))
+
+    roll_no = session['roll_no']
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 1. Reject in allotments
+            cursor.execute("UPDATE allotments SET status = 'rejected' WHERE student_roll_no = %s", (roll_no,))
+
+            # 2. Cancel in applications
+            cursor.execute("UPDATE applications SET status = 'cancelled' WHERE roll_no = %s", (roll_no,))
+
+        conn.commit()
+        
+        return redirect(url_for('applicant_dashboard'))
+
+    finally:
+        conn.close()
+@app.route('/admin/cancel_pending', methods=['POST'])
+def cancel_all_pending_requests():
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_login'))
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            # Update pending statuses in allotments table
+            cursor.execute("UPDATE allotments SET status='cancel' WHERE status='pending'")
+
+            # Update status to 'cancelled' in applications where there's a pending allotment
+            cursor.execute("""
+                UPDATE applications 
+                SET status='cancelled' 
+                WHERE roll_no IN (
+                    SELECT student_roll_no 
+                    FROM allotments 
+                    WHERE status='cancel'
+                )
+            """)
+        conn.commit()
+    finally:
+        conn.close()
+
+    return redirect(url_for('admin_allotment'))
+
 
 if __name__ == '__main__':
     app.run(debug=True)

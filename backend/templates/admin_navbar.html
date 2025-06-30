@@ -1,7 +1,7 @@
 <!-- templates/admin_navbar.html -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-dark custom-navbar">
     <div class="container-fluid">
-        <a class="navbar-brand" href="/admin/dashboard">Hostel Admin</a>
+        <a class="navbar-brand fw-semibold" href="/admin/dashboard">Hostel Admin</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNavbar">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -9,23 +9,43 @@
         <div class="collapse navbar-collapse" id="adminNavbar">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                 <li class="nav-item">
-                    <a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="/admin/dashboard">Home</a>
+                    <a class="nav-link {% if active_page == 'dashboard' %}active text-warning{% endif %}" href="/admin/dashboard">Home</a>
                 </li>
-                
-
                 <li class="nav-item">
-                    <a class="nav-link {% if active_page == 'applications' %}active{% endif %}" href="/admin/applications">Applications</a>
+                    <a class="nav-link {% if active_page == 'applications' %}active text-warning{% endif %}" href="/admin/applications">Applications</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('start_allotment') }}">Start Allotment</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if active_page == 'allotment' %}active{% endif %}" href="/admin/allotment">Allotment</a>
+                    <a class="nav-link {% if active_page == 'allotment' %}active text-warning{% endif %}" href="/admin/allotment">Allotment</a>
                 </li>
             </ul>
             <form class="d-flex" action="/admin/logout" method="POST">
-                <button class="btn btn-outline-light" type="submit">Logout</button>
+                <button class="btn btn-outline-light btn-sm" type="submit">Logout</button>
             </form>
         </div>
     </div>
 </nav>
+
+<style>
+    .custom-navbar {
+        background-color: #17a2b8 !important;
+    }
+
+    .navbar-nav .nav-link {
+        color: #f8f9fa !important; /* Light text */
+        font-weight: 500;
+        padding: 8px 12px;
+        border-radius: 6px;
+    }
+
+    .navbar-nav .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+        transition: background 0.2s ease-in-out;
+    }
+
+    .navbar-nav .nav-link.active {
+        background-color: #138496;
+    }
+</style>

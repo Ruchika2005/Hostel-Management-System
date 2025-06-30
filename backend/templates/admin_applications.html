@@ -47,7 +47,7 @@
                     <th>Email</th>
                     <th>Phone</th>
                     <th>Status</th>
-                    
+                    <th>Actions</th>  
                 </tr>
             </thead>
             <tbody>
@@ -68,10 +68,20 @@
                             {{ app.status.capitalize() }}
                         </span>
                     </td>
-                    
+                    <td>
+                        {% if app.status == 'pending' %}
+                        <form method="POST" action="{{ url_for('reject_application') }}" class="action-form">
+                            <input type="hidden" name="roll_no" value="{{ app.roll_no }}">
+                            <button type="submit" class="btn btn-danger btn-sm action-btn" onclick="return confirm('Are you sure you want to reject this application?')">Reject</button>
+                        </form>
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
+
         </table>
     </div>
 </div>
